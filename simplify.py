@@ -234,5 +234,5 @@ if __name__ == "__main__":
     img = cv2.imread(cv2.samples.findFile("test_cropped2.jpg"))
     assert img is not None, "file could not be read"
 
-    imag_flatten(img, 0.001, 2.5, 0.5)
+    imag_flatten(img, 0.001, 2.5, 5.0)
 
