@@ -1,7 +1,8 @@
 
-from scipy.sparse import identity, csr_matrix
-from scipy.sparse.linalg import spsolve
+from cupyx.scipy.sparse import identity, csr_matrix
+from cupyx.scipy.sparse.linalg import spsolve
 import numpy as np
+import cupy as cp
 import cv2
 import sys
 import random
@@ -116,8 +117,8 @@ def local_neighborhood(img, y, x, h):
 
     return surrounding(img, (y, x, None), (h, h, None))
 
-
 def compute_L(img, h=11):
+    img = cp.asnumpy(img)
     m_l = (2*h + 1) ** 2
     n = img.shape[0] * img.shape[1]
 
@@ -154,13 +155,14 @@ def compute_L(img, h=11):
                         M[k, i] = result
                         M[k, j] = -result
 
-    O = np.zeros_like(M)
+    M = cp.asarray(M)
+    O = cp.zeros_like(M)
 
-    return np.concatenate(
+    return cp.concatenate(
         [
-            np.concatenate([M, O, O], axis=1), 
-            np.concatenate([O, M, O], axis=1), 
-            np.concatenate([O, O, M], axis=1)
+            cp.concatenate([M, O, O], axis=1), 
+            cp.concatenate([O, M, O], axis=1), 
+            cp.concatenate([O, O, M], axis=1)
         ], 
         axis=0
     )
@@ -170,7 +172,7 @@ def rgb2z(img):
     z_r = img[:,:,0].flatten()
     z_g = img[:,:,1].flatten()
     z_b = img[:,:,2].flatten()
-    return np.concatenate((z_r.T, z_g.T, z_b.T)).T
+    return cp.concatenate((z_r.T, z_g.T, z_b.T)).T
 
 
 def z2rgb(z, y, x):
@@ -178,7 +180,7 @@ def z2rgb(z, y, x):
     z_r = z[0:len]
     z_g = z[len:2*len]
     z_b = z[2*len:]
-    img = np.zeros((y, x, 3), dtype=np.uint8)
+    img = cp.zeros((y, x, 3), dtype=np.uint8)
     img[:,:,0] = z_r.reshape((y, x))
     img[:,:,1] = z_g.reshape((y, x))
     img[:,:,2] = z_b.reshape((y, x))
@@ -186,50 +188,58 @@ def z2rgb(z, y, x):
 
 
 def shrink(y, p_gamma):
-    y_norm = np.linalg.norm(y)
+    y_norm = cp.linalg.norm(y)
     return (y / y_norm) * max(y_norm - p_gamma, 0)
 
 
-def image_flatten(img, p_epsilon, p_beta, p_lambda):
-    zin = rgb2z(img)
-    z = np.zeros((3, zin.shape[0]))
+def image_flatten(img, p_h, p_epsilon, p_beta, p_lambda):
+    zin = rgb2z(cp.asarray(img))
+    z = cp.zeros((3, zin.shape[0]))
     z[0] = zin
 
     print("zin.shape:", zin.shape)
 
-    L = csr_matrix(compute_L(img, 5))
-    d = np.zeros((3, L.shape[0]))
-    b = np.zeros((3, L.shape[0]))
+    L = csr_matrix(compute_L(img, p_h))
+    d = cp.zeros((3, L.shape[0]))
+    b = cp.zeros((3, L.shape[0]))
 
     print("L.shape:", L.shape)
     LT = L.transpose()
-    LTL = LT * L
     print("LT.shape:", LT.shape)
+    LTL = LT.multiply(L.toarray())
     print("LTL.shape:", LTL.shape)
     I = identity(LTL.shape[0], dtype='float', format='csr')
     print("I.shape:", I.shape)
 
-    while np.square((np.linalg.norm(z[1] - z[0]))) > p_epsilon:
+    i = 0
+    print("\n---- OPTIMIZATION ------------------")
+    while (cp.linalg.norm(z[1] - z[0]) ** 2) > p_epsilon:
+        print("Iteration {}".format(i))
+        print("difference:", cp.linalg.norm(z[1] - z[0]) ** 2)
+        print("")
+
         A = p_beta * I + p_lambda * LTL
-        v = p_beta * zin + p_lambda * LT * (d[1] - b[1])
+        v = csr_matrix(p_beta * zin) + p_lambda * LT.multiply(csr_matrix(d[1] - b[1]))
 
-        z[2] = spsolve(A, v)
+        z[2] = spsolve(A, v.toarray())
 
-        d[2] = shrink(L * z[2] + b[1], 1 / p_lambda)
-        b[2] = b[1] + L * z[2] - d[2]
+        d[2] = shrink(L.multiply(z[2]) + b[1], 1 / p_lambda)
+        b[2] = b[1] + L.multiply(z[2]) - d[2]
 
-        z[0] = z[1]
-        z[1] = z[2]
-        d[0] = d[1]
-        d[1] = d[2]
-        b[0] = b[1]
-        b[1] = b[2]
+        for i in range(0, 2):
+            z[i] = z[i+1]
+            d[i] = d[i+1]
+            b[i] = b[i+1]
 
-    return z2rgb(z[2])
+        i = i + 1
+
+    return z2rgb(z[2], img.shape[0], img.shape[1])
 
 if __name__ == "__main__":
-    img = cv2.imread(cv2.samples.findFile("test_data/test_cropped2.jpg"))
+    filename = "test_data/car_50_50"
+    filetype = ".jpg"
+    img = cp.asarray(cv2.imread(cv2.samples.findFile(filename + filetype)))
     assert img is not None, "file could not be read"
 
-    flat_img = image_flatten(img, 0.001, 2.5, 5.0)
-    cv2.imshow(flat_img)
+    flat_img = cp.asnumpy(image_flatten(img, 11, 1.0, 2.5, 5.0))
+    cv2.imwrite(filename + "_flattened" + filetype, flat_img)
