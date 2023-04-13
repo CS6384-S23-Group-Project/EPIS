@@ -58,7 +58,6 @@ def affinity(pi_lab, pj_lab):
 
 
 # Source: https://gist.github.com/pghazanfari/b23739a0a057e165fa8b591a64ca181d
-# *modified by me for images
 def surrounding(x, idx, radius=1, fill=0):
     """ 
     Gets surrounding elements from a numpy array 
