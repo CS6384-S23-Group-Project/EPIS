@@ -118,24 +118,6 @@ def local_neighborhood(img, y, x, h):
     return surrounding(img, (y, x, None), (h, h, None))
 
 
-# def energy_local_flatten(img, h):
-#     energy_local = 0.0
-
-#     for x1 in range(0, img.shape[0]):
-#         for y1 in range(0, img.shape[1]):
-#             pixel_i = img[x1, y1]
-#             window = local_neighborhood(img, x1, y1, h)
-
-#             for x2 in range(0, window.shape[0]):
-#                 for y2 in range(0, window.shape[1]):
-#                     pixel_j = window[x2, y2]
-#                     if pixel_j[0] == 0 and pixel_j[1] == 0 and pixel_j[2] == 0:
-#                         continue
-#                     energy_local += affinity(pixel_i, pixel_j) * np.linalg.norm(pixel_i - pixel_j)
-    
-#     return energy_local
-
-
 def compute_L(img, h=11):
     m_l = (2*h + 1) ** 2
     n = img.shape[0] * img.shape[1]
@@ -149,8 +131,6 @@ def compute_L(img, h=11):
             img_lab[y1, x1] = rgb2lab(img[y1, x1])
 
     M = np.zeros((m_l, n))
-
-    print("M.shape:", M.shape)
 
     for y1 in range(0, img.shape[0]):
         for x1 in range(0, img.shape[1]):
@@ -192,7 +172,19 @@ def rgb2z(img):
     z_g = img[:,:,1].flatten()
     z_b = img[:,:,2].flatten()
     return np.concatenate((z_r.T, z_g.T, z_b.T)).T
-    
+
+
+def z2rgb(z, y, x):
+    len = z.shape[0] // 3
+    z_r = z[0:len]
+    z_g = z[len:2*len]
+    z_b = z[2*len:]
+    img = np.zeros((y, x, 3), dtype=np.uint8)
+    img[:,:,0] = z_r.reshape((y, x))
+    img[:,:,1] = z_g.reshape((y, x))
+    img[:,:,2] = z_b.reshape((y, x))
+    return img
+
 
 def shrink(y, p_gamma):
     y_norm = np.linalg.norm(y)
@@ -201,16 +193,22 @@ def shrink(y, p_gamma):
 
 def image_flatten(img, p_epsilon, p_beta, p_lambda):
     zin = rgb2z(img)
-    z = np.zeros((3, zin.shape[0], zin.shape[1]))
-    d = np.zeros_like(z)
-    b = np.zeros_like(z)
-
+    z = np.zeros((3, zin.shape[0]))
     z[0] = zin
 
+    print("zin.shape:", zin.shape)
+
     L = csr_matrix(compute_L(img, 5))
+    d = np.zeros((3, L.shape[0]))
+    b = np.zeros((3, L.shape[0]))
+
+    print("L.shape:", L.shape)
     LT = L.transpose()
     LTL = LT * L
-    I = identity(LTL.shape, dtype='float', format='csr')
+    print("LT.shape:", LT.shape)
+    print("LTL.shape:", LTL.shape)
+    I = identity(LTL.shape[0], dtype='float', format='csr')
+    print("I.shape:", I.shape)
 
     while np.square((np.linalg.norm(z[1] - z[0]))) > p_epsilon:
         A = p_beta * I + p_lambda * LTL
@@ -227,13 +225,12 @@ def image_flatten(img, p_epsilon, p_beta, p_lambda):
         d[1] = d[2]
         b[0] = b[1]
         b[1] = b[2]
-        
-        break # temporary
 
+    return z2rgb(z[2])
 
 if __name__ == "__main__":
-    img = cv2.imread(cv2.samples.findFile("test_cropped2.jpg"))
+    img = cv2.imread(cv2.samples.findFile("test_data/test_cropped2.jpg"))
     assert img is not None, "file could not be read"
 
-    imag_flatten(img, 0.001, 2.5, 5.0)
-
+    flat_img = image_flatten(img, 0.001, 2.5, 5.0)
+    cv2.imshow(flat_img)
