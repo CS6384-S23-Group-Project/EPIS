@@ -171,7 +171,7 @@ if __name__ == "__main__":
     img = cp.asarray(cv2.imread(cv2.samples.findFile(filename + filetype)))
     assert img is not None, "file could not be read"
 
-    p_h = 11
+    p_h = 15
     p_epsilon = 0.001
     p_beta = 2.5
     p_lambda = 5.0
