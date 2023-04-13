@@ -1,5 +1,6 @@
 
-from scipy.sparse import identity, csr_matrix, spsolve
+from scipy.sparse import identity, csr_matrix
+from scipy.sparse.linalg import spsolve
 import numpy as np
 import cv2
 import sys
