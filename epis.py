@@ -59,9 +59,6 @@ def compute_L(img, p_h, p_kappa, p_sigma):
     m_l = (2*p_h + 1) ** 2
     n = img.shape[0] * img.shape[1]
 
-    print("m_l:", m_l)
-    print("n:", n)
-
     img_lab = np.zeros_like(img, dtype=np.float64)
     for y1 in range(0, img.shape[0]):
         for x1 in range(0, img.shape[1]):
@@ -135,21 +132,14 @@ def image_flatten(img, p_h, p_epsilon, p_beta, p_lambda, p_kappa, p_sigma):
     z = cp.zeros((3, zin.shape[0]))
     z[0] = zin
 
-    print("zin.shape:", zin.shape)
+    d = cp.zeros((3, 3 * ((2 * p_h + 1) ** 2)))
+    b = cp.zeros((3, 3 * ((2 * p_h + 1) ** 2)))
 
-    L = csr_matrix(compute_L(img, p_h, p_kappa, p_sigma))
-    d = cp.zeros((3, L.shape[0]))
-    b = cp.zeros((3, L.shape[0]))
+    I = identity(zin.shape[0], dtype=cp.float64, format='csr')
 
-    print("L.shape:", L.shape)
+    L = csr_matrix(compute_L(z2rgb(z[0], img.shape[0], img.shape[1]), p_h, p_kappa, p_sigma))
     LT = L.transpose()
-    print("LT.shape:", LT.shape)
     LTL = LT.dot(L)
-    print("LTL.shape:", LTL.shape)
-    I = identity(LTL.shape[0], dtype='float', format='csr')
-    print("I.shape:", I.shape)
-
-    A = p_beta * I + p_lambda * LTL
 
     i = 0
     print("\n---- OPTIMIZATION ------------------")
@@ -158,6 +148,7 @@ def image_flatten(img, p_h, p_epsilon, p_beta, p_lambda, p_kappa, p_sigma):
         print("difference:", cp.linalg.norm(z[1] - z[0]) ** 2)
         print("")
 
+        A = p_beta * I + p_lambda * LTL
         v = p_beta * zin + cp.asarray(p_lambda * LT.dot(d[1] - b[1]))
 
         z[2] = spsolve(A, v)
