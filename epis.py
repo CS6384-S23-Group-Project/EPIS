@@ -206,7 +206,7 @@ def image_flatten(img, p_h, p_epsilon, p_beta, p_lambda):
     print("L.shape:", L.shape)
     LT = L.transpose()
     print("LT.shape:", LT.shape)
-    LTL = LT.multiply(L.toarray())
+    LTL = LT.dot(L)
     print("LTL.shape:", LTL.shape)
     I = identity(LTL.shape[0], dtype='float', format='csr')
     print("I.shape:", I.shape)
@@ -219,17 +219,17 @@ def image_flatten(img, p_h, p_epsilon, p_beta, p_lambda):
         print("")
 
         A = p_beta * I + p_lambda * LTL
-        v = csr_matrix(p_beta * zin) + p_lambda * LT.multiply(csr_matrix(d[1] - b[1]))
+        v = p_beta * zin + cp.asarray(p_lambda * LT.dot(d[1] - b[1]))
 
-        z[2] = spsolve(A, v.toarray())
+        z[2] = spsolve(A, v)
 
-        d[2] = shrink(L.multiply(z[2]) + b[1], 1 / p_lambda)
-        b[2] = b[1] + L.multiply(z[2]) - d[2]
+        d[2] = shrink(L.dot(z[2]) + b[1], 1 / p_lambda)
+        b[2] = b[1] + L.dot(z[2]) - d[2]
 
-        for i in range(0, 2):
-            z[i] = z[i+1]
-            d[i] = d[i+1]
-            b[i] = b[i+1]
+        for j in range(0, 2):
+            z[j] = z[j+1]
+            d[j] = d[j+1]
+            b[j] = b[j+1]
 
         i = i + 1
 
