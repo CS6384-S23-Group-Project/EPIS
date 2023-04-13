@@ -51,12 +51,12 @@ def affinity(pi_lab, pj_lab, p_kappa, p_sigma):
     pi_lab[0] = pi_lab[0] * p_kappa
     pj_lab[0] = pj_lab[0] * p_kappa
 
-    return np.exp(- (np.square(np.linalg.norm(pi_lab - pj_lab)) / 2 * (p_sigma ** 2)))
+    return np.exp(- ((np.linalg.norm(pi_lab - pj_lab) ** 2) / 2 * (p_sigma ** 2)))
 
 
 def compute_L(img, p_h, p_kappa, p_sigma):
     img = cp.asnumpy(img)
-    m_l = (2*p_h + 1) ** 2
+    m_l = p_h ** 2
     n = img.shape[0] * img.shape[1]
 
     img_lab = np.zeros_like(img, dtype=np.float64)
@@ -71,10 +71,10 @@ def compute_L(img, p_h, p_kappa, p_sigma):
             pixel_i = img_lab[y1, x1]
             i = y1 * img.shape[0] + x1
 
-            ly = y1 - p_h 
-            ry = y1 + p_h
-            lx = x1 - p_h
-            rx = x1 + p_h 
+            ly = y1 - (p_h // 2 - 1)
+            ry = y1 + (p_h // 2 - 1)
+            lx = x1 - (p_h // 2 - 1)
+            rx = x1 + (p_h // 2 - 1)
 
             k = 0
             for y2 in range(ly, ry):
@@ -85,8 +85,8 @@ def compute_L(img, p_h, p_kappa, p_sigma):
 
                         result = affinity(pixel_i, pixel_j, p_kappa, p_sigma)
                         #print("k: {}, i: {} - ({}, {}), j: {} - ({}, {}), affinity: {}".format(k, i, y1, x1, j, y2, x2, result))
-                        M[k, j] = -result
                         M[k, i] = result
+                        M[k, j] = -result
                     k += 1
 
     #print("M:", M[:,0])
@@ -132,14 +132,14 @@ def image_flatten(img, p_h, p_epsilon, p_beta, p_lambda, p_kappa, p_sigma):
     z = cp.zeros((3, zin.shape[0]))
     z[0] = zin
 
-    d = cp.zeros((3, 3 * ((2 * p_h + 1) ** 2)))
-    b = cp.zeros((3, 3 * ((2 * p_h + 1) ** 2)))
+    d = cp.zeros((3, 3 * (p_h ** 2)))
+    b = cp.zeros((3, 3 * (p_h ** 2)))
 
     I = identity(zin.shape[0], dtype=cp.float64, format='csr')
 
     L = csr_matrix(compute_L(z2rgb(z[0], img.shape[0], img.shape[1]), p_h, p_kappa, p_sigma))
-    LT = L.transpose()
-    LTL = LT.dot(L)
+    LT = L.T
+    LTL = LT @ L
 
     i = 0
     print("\n---- OPTIMIZATION ------------------")
@@ -149,12 +149,12 @@ def image_flatten(img, p_h, p_epsilon, p_beta, p_lambda, p_kappa, p_sigma):
         print("")
 
         A = p_beta * I + p_lambda * LTL
-        v = p_beta * zin + cp.asarray(p_lambda * LT.dot(d[1] - b[1]))
+        v = p_beta * zin + cp.asarray(p_lambda * LT @ (d[1] - b[1]))
 
         z[2] = spsolve(A, v)
 
-        d[2] = shrink(L.dot(z[2]) + b[1], 1 / p_lambda)
-        b[2] = b[1] + L.dot(z[2]) - d[2]
+        d[2] = shrink(L @ z[2] + b[1], 1 / p_lambda)
+        b[2] = b[1] + L @ z[2] - d[2]
 
         for j in range(0, 2):
             z[j] = z[j+1]
