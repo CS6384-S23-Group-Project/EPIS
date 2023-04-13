@@ -130,7 +130,7 @@ def compute_L(img, h=11):
         for x1 in range(0, img.shape[1]):
             img_lab[y1, x1] = rgb2lab(img[y1, x1])
 
-    M = np.zeros((m_l, n))
+    M = np.zeros((m_l, n), dtype=float)
 
     for y1 in range(0, img.shape[0]):
         for x1 in range(0, img.shape[1]):
@@ -211,6 +211,8 @@ def image_flatten(img, p_h, p_epsilon, p_beta, p_lambda):
     I = identity(LTL.shape[0], dtype='float', format='csr')
     print("I.shape:", I.shape)
 
+    A = p_beta * I + p_lambda * LTL
+
     i = 0
     print("\n---- OPTIMIZATION ------------------")
     while (cp.linalg.norm(z[1] - z[0]) ** 2) > p_epsilon:
@@ -218,7 +220,6 @@ def image_flatten(img, p_h, p_epsilon, p_beta, p_lambda):
         print("difference:", cp.linalg.norm(z[1] - z[0]) ** 2)
         print("")
 
-        A = p_beta * I + p_lambda * LTL
         v = p_beta * zin + cp.asarray(p_lambda * LT.dot(d[1] - b[1]))
 
         z[2] = spsolve(A, v)
