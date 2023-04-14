@@ -8,54 +8,6 @@ import sys
 import random
 
 
-def rgb2srgb(pixel_rgb):
-    srgb = np.zeros_like(pixel_rgb, dtype=float)
-    
-    for i in range(0, pixel_rgb.shape[0]):
-        value = float(pixel_rgb[i]) / 255
-        if value < 0:
-            pass
-        elif value >= 0 and value < 0.0031308:
-            value = value * 12.92
-        else:
-            value = 1.055 * (value ** (1/2.4)) + -0.055
-        srgb[i] = value * 255
-
-    return srgb
-
-
-def rgb2lab(pixel_rgb):
-    rgb = np.zeros_like(pixel_rgb, dtype=float)
-    xyz = np.zeros_like(pixel_rgb, dtype=float)
-    lab = np.zeros_like(pixel_rgb, dtype=float)
-    
-    for i in range(0, pixel_rgb.shape[0]):
-        value = float(pixel_rgb[i]) / 255
-        if value > 0.04045:
-            value = ((value + 0.055) / 1.055) ** 2.4
-        else:
-            value = value / 12.92
-        rgb[i] = value * 100
-
-    xyz[0] = ((rgb[0] * 0.4124) + (rgb[1] * 0.3576) + (rgb[2] * 0.1805)) / 95.047
-    xyz[1] = ((rgb[0] * 0.2126) + (rgb[1] * 0.7152) + (rgb[2] * 0.0722)) / 100.0
-    xyz[2] = ((rgb[0] * 0.0193) + (rgb[1] * 0.1192) + (rgb[2] * 0.9505)) / 108.883
-
-    for i in range(0, xyz.shape[0]):
-        value = xyz[i]
-        if value > 0.008856:
-            value = value ** (0.3333333333333333)
-        else:
-            value = (7.787 * value) + (16 / 116)
-        xyz[i] = value
-
-    lab[0] = (116 * xyz[1]) - 16
-    lab[1] = 500 * (xyz[0] - xyz[1])
-    lab[2] = 200 * (xyz[1] - xyz[2])
-
-    return lab
-
-
 def affinity(pi_lab, pj_lab, p_kappa, p_sigma):
     """ 
     pi_lab: np.ndarray(3)
@@ -193,17 +145,10 @@ def image_flatten(img, p_iter, p_h, p_epsilon, p_theta, p_lambda, p_kappa, p_sig
     return z2rgb(z[2], img.shape[0], img.shape[1])
 
 if __name__ == "__main__":
-    filename = "test_data/car_50_50"
-    filetype = ".jpg"
+    filename = "test_data/seaside_150_150"
+    filetype = ".png"
     img = cv2.imread(cv2.samples.findFile(filename + filetype))
     assert img is not None, "file could not be read"
-
-    # print(img[0,0])
-    # print(rgb2srgb(img[0,0]))
-    # print(rgb2lab(img[0,0]))
-    # print(rgb2lab(rgb2srgb(img[0,0])))
-    # lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
-    # print(lab[0,0])
 
     p_iter = 5
     p_h = 5
