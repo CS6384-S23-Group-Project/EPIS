@@ -8,6 +8,22 @@ import sys
 import random
 
 
+def rgb2srgb(pixel_rgb):
+    srgb = np.zeros_like(pixel_rgb, dtype=float)
+    
+    for i in range(0, pixel_rgb.shape[0]):
+        value = float(pixel_rgb[i]) / 255
+        if value < 0:
+            pass
+        elif value >= 0 and value < 0.0031308:
+            value = value * 12.92
+        else:
+            value = 1.055 * (value ** (1/2.4)) + -0.055
+        srgb[i] = value * 255
+
+    return srgb
+
+
 def rgb2lab(pixel_rgb):
     rgb = np.zeros_like(pixel_rgb, dtype=float)
     xyz = np.zeros_like(pixel_rgb, dtype=float)
@@ -59,16 +75,18 @@ def compute_L(img, p_h, p_kappa, p_sigma):
     n = img.shape[0] * img.shape[1]
     m_l = n * (p_h ** 2)
 
-    img_lab = np.zeros_like(img, dtype=np.float64)
-    for y1 in range(0, img.shape[0]):
-        for x1 in range(0, img.shape[1]):
-            img_lab[y1, x1] = rgb2lab(img[y1, x1])
+    img_lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+
+    img_lab[:,:,0] = img_lab[:,:,0] / 100.0 * 10.0
+    img_lab[:,:,1] = img_lab[:,:,1] / 220.0 * 120.0
+    img_lab[:,:,2] = img_lab[:,:,2] / 220.0 * 120.0
 
     pair1 = cp.zeros((m_l), dtype=cp.uint32)
     pair2 = cp.zeros((m_l), dtype=cp.uint32)
-    val = cp.zeros((m_l), dtype=cp.float32)
-    indptr = cp.zeros((m_l), dtype=cp.uint32)
+    val_pos = cp.zeros((m_l), dtype=cp.float32)
+    val_neg = cp.zeros((m_l), dtype=cp.float32)
 
+    # TODO: Implement a faster approach instead of iteration
     k = 0
     for y1 in range(0, img_lab.shape[0]):
         for x1 in range(0, img_lab.shape[1]):
@@ -83,20 +101,21 @@ def compute_L(img, p_h, p_kappa, p_sigma):
 
                         pair1[k] = i 
                         pair2[k] = j 
-                        val[k] = np.linalg.norm(pixel_i - pixel_j)
+
+                        result = affinity(pixel_i, pixel_j, p_kappa, p_sigma)
+                        val_pos[k] = result
+                        val_neg[k] = -result
 
                         k += 1
 
-    val = np.exp(- np.square(val) / 2 * (p_sigma ** 2))
+    rows = cp.asarray(np.arange(start=0, stop=m_l, dtype=np.float32), dtype=cp.float32)
+    rows = cp.hstack([rows, rows])
+    cols = cp.hstack([pair1, pair2])
+    vals = cp.hstack([val_pos, val_neg])
 
-    M = csr_matrix((val, (pair2, pair1)), shape=(n, m_l))
-    print("n:", n)
-    print("m_l:", m_l)
-    print("M.shape:", M.shape)
-    #M = M.resize((n, m_l))
-    #print("M.shape:", M.shape)
-    O = csr_matrix((n, m_l), dtype=cp.float32)
-    print("O.shape:", O.shape)
+    M = csr_matrix((vals, (rows, cols)), shape=(m_l, n))
+    print("M:", M[0:10,0:10])
+    O = csr_matrix((m_l, n), dtype=cp.float32)
 
     return vstack(
         [
@@ -104,7 +123,7 @@ def compute_L(img, p_h, p_kappa, p_sigma):
             hstack([O, M, O]), 
             hstack([O, O, M])
         ],
-    ).T
+    )
 
 
 def rgb2z(img):
@@ -176,10 +195,17 @@ def image_flatten(img, p_iter, p_h, p_epsilon, p_theta, p_lambda, p_kappa, p_sig
 if __name__ == "__main__":
     filename = "test_data/car_50_50"
     filetype = ".jpg"
-    img = cp.asarray(cv2.imread(cv2.samples.findFile(filename + filetype)))
+    img = cv2.imread(cv2.samples.findFile(filename + filetype))
     assert img is not None, "file could not be read"
 
-    p_iter = 10
+    # print(img[0,0])
+    # print(rgb2srgb(img[0,0]))
+    # print(rgb2lab(img[0,0]))
+    # print(rgb2lab(rgb2srgb(img[0,0])))
+    # lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+    # print(lab[0,0])
+
+    p_iter = 5
     p_h = 5
     p_epsilon = 0.001
     p_theta = 2.5
