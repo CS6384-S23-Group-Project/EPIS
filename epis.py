@@ -19,7 +19,7 @@ def affinity(pi_lab, pj_lab, p_kappa, p_sigma):
     pi_lab[0] = pi_lab[0] * p_kappa
     pj_lab[0] = pj_lab[0] * p_kappa
 
-    return np.exp(- ((np.linalg.norm(pi_lab - pj_lab) ** 2) / 2 * (p_sigma ** 2)))
+    return np.exp(-((2 * p_sigma) ** 2) * np.linalg.norm(pi_lab - pj_lab))
 
 
 def compute_L(img, p_h, p_kappa, p_sigma):
@@ -102,23 +102,20 @@ def shrink(y, p_gamma):
     return (y / y_norm) * max(y_norm - p_gamma, 0)
 
 
-def image_flatten(img, p_iter, p_h, p_epsilon, p_theta, p_lambda, p_kappa, p_sigma):
+def image_flatten(img, p_iter, p_h, p_alpha, p_epsilon, p_theta, p_lambda, p_kappa, p_sigma):
     zin = rgb2z(cp.asarray(img))
     z = cp.zeros((3, zin.shape[0]))
     z[0] = zin
 
-    L = compute_L(z2rgb(z[0], img.shape[0], img.shape[1]), p_h, p_kappa, p_sigma)
-    print("L.shape:", L.shape)
+    L = p_alpha * compute_L(z2rgb(z[0], img.shape[0], img.shape[1]), p_h, p_kappa, p_sigma)
     LT = L.T
-    print("LT.shape:", LT.shape)
     LTL = LT @ L
-    print("LTL.shape:", LTL.shape)
 
     d = cp.zeros((3, L.shape[0]))
     b = cp.zeros((3, L.shape[0]))
-    print("d[0].shape:", d[0].shape)
 
     I = identity(LTL.shape[0], dtype=cp.float64, format='csr')
+    A = p_theta * I + p_lambda * LTL
 
     i = 0
     print("\n---- OPTIMIZATION ------------------")
@@ -127,7 +124,6 @@ def image_flatten(img, p_iter, p_h, p_epsilon, p_theta, p_lambda, p_kappa, p_sig
         print("difference:", cp.linalg.norm(z[1] - z[0]))
         print("")
 
-        A = p_theta * I + p_lambda * LTL
         v = p_theta * zin + cp.asarray(p_lambda * LT @ (d[1] - b[1]))
 
         z[2] = spsolve(A, v)
@@ -150,12 +146,13 @@ if __name__ == "__main__":
     img = cv2.imread(cv2.samples.findFile(filename + filetype))
     assert img is not None, "file could not be read"
 
-    p_iter = 5
+    p_iter = 4
     p_h = 5
+    p_alpha = 20.0
     p_epsilon = 0.001
     p_theta = 2.5
     p_lambda = 30
-    p_kappa = 0.3
+    p_kappa = 1.0
     p_sigma = 0.5
-    flat_img = cp.asnumpy(image_flatten(img, p_iter, p_h, p_epsilon, p_theta, p_lambda, p_kappa, p_sigma))
+    flat_img = cp.asnumpy(image_flatten(img, p_iter, p_h, p_alpha, p_epsilon, p_theta, p_lambda, p_kappa, p_sigma))
     cv2.imwrite(filename + "_flattened" + filetype, flat_img)

@@ -1,0 +1,8 @@
+[] indicates optional
+{} indicates substitution
+
+filename = {name}_{width}_{height}_[flattened]_[{parameters}].{filetype}
+parameters = ({iter}_{h}_{alpha}_{epsilon}_{theta}_{lambda}_{kappa}_{sigma})
+
+# NOTE: ^ represents periods. i.e. 0.5 -> 0^5, 0.001 -> 0^001
+# NOTE: Look at epis.py for meaning of parameters
