@@ -22,23 +22,12 @@ def affinity(pi_lab, pj_lab, p_kappa, p_sigma):
     return np.exp(- np.linalg.norm(pi_lab - pj_lab) * p_sigma)
 
 
-def compute_L(img, p_h, p_kappa, p_sigma):
-    img = cp.asnumpy(img)
-    n = img.shape[0] * img.shape[1]
-    m_l = n * (p_h ** 2)
-
-    img_lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
-
-    img_lab[:,:,0] = (img_lab[:,:,0] / 100.0) * 10.0
-    img_lab[:,:,1] = (img_lab[:,:,1] / 220.0) * 120.0
-    img_lab[:,:,2] = (img_lab[:,:,2] / 220.0) * 120.0
-
+def compute_pairs(img_lab, p_kappa, p_sigma):
     pair1 = cp.zeros((m_l), dtype=cp.uint32)
     pair2 = cp.zeros((m_l), dtype=cp.uint32)
     val_pos = cp.zeros((m_l), dtype=cp.float32)
     val_neg = cp.zeros((m_l), dtype=cp.float32)
 
-    # TODO: Implement a faster approach instead of iteration
     k = 0
     for y1 in range(0, img_lab.shape[0]):
         for x1 in range(0, img_lab.shape[1]):
@@ -59,6 +48,22 @@ def compute_L(img, p_h, p_kappa, p_sigma):
                         val_neg[k] = -result
 
                         k += 1
+
+    return (pair1, pair2, val_pos, val_neg)
+
+
+def compute_L(img, p_h, p_kappa, p_sigma):
+    img = cp.asnumpy(img)
+    n = img.shape[0] * img.shape[1]
+    m_l = n * (p_h ** 2)
+
+    img_lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+
+    img_lab[:,:,0] = (img_lab[:,:,0] / 100.0) * 10.0
+    img_lab[:,:,1] = (img_lab[:,:,1] / 220.0) * 120.0
+    img_lab[:,:,2] = (img_lab[:,:,2] / 220.0) * 120.0
+
+    pair1, pair2, val_pos, val_neg = compute_pairs(img_lab, p_h, p_kappa, p_sigma)
 
     rows = cp.asarray(np.arange(start=0, stop=m_l, dtype=np.float32), dtype=cp.float32)
     rows = cp.hstack([rows, rows])
