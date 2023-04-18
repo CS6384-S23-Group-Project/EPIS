@@ -19,7 +19,7 @@ def affinity(pi_lab, pj_lab, p_kappa, p_sigma):
     pi_lab[0] = pi_lab[0] * p_kappa
     pj_lab[0] = pj_lab[0] * p_kappa
 
-    return np.exp(-((2 * p_sigma) ** 2) * np.linalg.norm(pi_lab - pj_lab))
+    return np.exp(- np.linalg.norm(pi_lab - pj_lab) * p_sigma)
 
 
 def compute_L(img, p_h, p_kappa, p_sigma):
@@ -29,9 +29,9 @@ def compute_L(img, p_h, p_kappa, p_sigma):
 
     img_lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
 
-    img_lab[:,:,0] = img_lab[:,:,0] / 100.0 * 10.0
-    img_lab[:,:,1] = img_lab[:,:,1] / 220.0 * 120.0
-    img_lab[:,:,2] = img_lab[:,:,2] / 220.0 * 120.0
+    img_lab[:,:,0] = (img_lab[:,:,0] / 100.0) * 10.0
+    img_lab[:,:,1] = (img_lab[:,:,1] / 220.0) * 120.0
+    img_lab[:,:,2] = (img_lab[:,:,2] / 220.0) * 120.0
 
     pair1 = cp.zeros((m_l), dtype=cp.uint32)
     pair2 = cp.zeros((m_l), dtype=cp.uint32)
@@ -102,6 +102,14 @@ def shrink(y, p_gamma):
     return (y / y_norm) * max(y_norm - p_gamma, 0)
 
 
+def shrink2(y, p_gamma):
+    # x = cp.copy(y)
+    # y = cp.max(cp.abs(y) - p_gamma, 0)
+    # y = cp.where(x < 0, y, -1 * y)
+    # return y
+    pass
+
+
 def image_flatten(img, p_iter, p_h, p_alpha, p_epsilon, p_theta, p_lambda, p_kappa, p_sigma):
     zin = rgb2z(cp.asarray(img))
     z = cp.zeros((3, zin.shape[0]))
@@ -140,6 +148,11 @@ def image_flatten(img, p_iter, p_h, p_alpha, p_epsilon, p_theta, p_lambda, p_kap
 
     return z2rgb(z[2], img.shape[0], img.shape[1])
 
+
+def modular_flatten(img, width, height):
+    pass
+
+
 if __name__ == "__main__":
     filename = "test_data/seaside_150_150"
     filetype = ".png"
@@ -150,9 +163,9 @@ if __name__ == "__main__":
     p_h = 5
     p_alpha = 20.0
     p_epsilon = 0.001
-    p_theta = 2.5
-    p_lambda = 30
+    p_theta = 50.0
+    p_lambda = 128.0
     p_kappa = 1.0
-    p_sigma = 0.5
+    p_sigma = 0.9
     flat_img = cp.asnumpy(image_flatten(img, p_iter, p_h, p_alpha, p_epsilon, p_theta, p_lambda, p_kappa, p_sigma))
     cv2.imwrite(filename + "_flattened" + filetype, flat_img)
