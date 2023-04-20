@@ -22,11 +22,14 @@ def affinity(pi_lab, pj_lab, p_kappa, p_sigma):
     return np.exp(- np.linalg.norm(pi_lab - pj_lab) * p_sigma)
 
 
-def compute_pairs(img_lab, p_kappa, p_sigma):
-    pair1 = cp.zeros((m_l), dtype=cp.uint32)
-    pair2 = cp.zeros((m_l), dtype=cp.uint32)
-    val_pos = cp.zeros((m_l), dtype=cp.float32)
-    val_neg = cp.zeros((m_l), dtype=cp.float32)
+def compute_pairs(img_lab, p_h, p_kappa, p_sigma):
+    n = img_lab.shape[0] * img_lab.shape[1]
+    m_l = n * (p_h ** 2)
+
+    pair1 = cp.zeros((m_l), dtype=cp.uint64)
+    pair2 = cp.zeros((m_l), dtype=cp.uint64)
+    val_pos = cp.zeros((m_l), dtype=cp.float64)
+    val_neg = cp.zeros((m_l), dtype=cp.float64)
 
     k = 0
     for y1 in range(0, img_lab.shape[0]):
@@ -57,7 +60,7 @@ def compute_L(img, p_h, p_kappa, p_sigma):
     n = img.shape[0] * img.shape[1]
     m_l = n * (p_h ** 2)
 
-    img_lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+    img_lab = cp.array(cv2.cvtColor(img, cv2.COLOR_BGR2LAB), dtype=cp.float64)
 
     img_lab[:,:,0] = (img_lab[:,:,0] / 100.0) * 10.0
     img_lab[:,:,1] = (img_lab[:,:,1] / 220.0) * 120.0
@@ -65,14 +68,14 @@ def compute_L(img, p_h, p_kappa, p_sigma):
 
     pair1, pair2, val_pos, val_neg = compute_pairs(img_lab, p_h, p_kappa, p_sigma)
 
-    rows = cp.asarray(np.arange(start=0, stop=m_l, dtype=np.float32), dtype=cp.float32)
+    rows = cp.asarray(np.arange(start=0, stop=m_l, dtype=np.float64), dtype=cp.float64)
     rows = cp.hstack([rows, rows])
     cols = cp.hstack([pair1, pair2])
     vals = cp.hstack([val_pos, val_neg])
 
-    M = csr_matrix((vals, (rows, cols)), shape=(m_l, n))
+    M = csr_matrix((vals, (rows, cols)), shape=(m_l, n), dtype=cp.float64)
     print("M:", M[0:10,0:10])
-    O = csr_matrix((m_l, n), dtype=cp.float32)
+    O = csr_matrix((m_l, n), dtype=cp.float64)
 
     return vstack(
         [
@@ -117,15 +120,15 @@ def shrink2(y, p_gamma):
 
 def image_flatten(img, p_iter, p_h, p_alpha, p_epsilon, p_theta, p_lambda, p_kappa, p_sigma):
     zin = rgb2z(cp.asarray(img))
-    z = cp.zeros((3, zin.shape[0]))
+    z = cp.zeros((3, zin.shape[0]), dtype=cp.float64)
     z[0] = zin
 
     L = p_alpha * compute_L(z2rgb(z[0], img.shape[0], img.shape[1]), p_h, p_kappa, p_sigma)
     LT = L.T
     LTL = LT @ L
 
-    d = cp.zeros((3, L.shape[0]))
-    b = cp.zeros((3, L.shape[0]))
+    d = cp.zeros((3, L.shape[0]), dtype=cp.float64)
+    b = cp.zeros((3, L.shape[0]), dtype=cp.float64)
 
     I = identity(LTL.shape[0], dtype=cp.float64, format='csr')
     A = p_theta * I + p_lambda * LTL
