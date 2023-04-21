@@ -30,19 +30,22 @@ def compute_pairs(img_lab, p_h, p_kappa, p_sigma):
     pair2 = cp.zeros((m_l), dtype=cp.uint64)
     val_pos = cp.zeros((m_l), dtype=cp.float64)
     val_neg = cp.zeros((m_l), dtype=cp.float64)
+    
+    print("img_lab.shape:", img_lab.shape)
 
     k = 0
     for y1 in range(0, img_lab.shape[0]):
         for x1 in range(0, img_lab.shape[1]):
             pixel_i = img_lab[y1, x1]
-            i = y1 * img_lab.shape[0] + x1
+
+            i = y1 * img_lab.shape[1] + x1
 
             for y2 in range(y1, y1 + p_h):
                 for x2 in range(x1, x1 + p_h):
                     if y2 < img_lab.shape[0] and x2 < img_lab.shape[1]:
                         pixel_j = img_lab[y2, x2]
-                        j = y2 * img.shape[0] + x2
-
+                        j = y2 * img_lab.shape[1] + x2
+                        
                         pair1[k] = i 
                         pair2[k] = j 
 
@@ -57,6 +60,7 @@ def compute_pairs(img_lab, p_h, p_kappa, p_sigma):
 
 def compute_L(img, p_h, p_kappa, p_sigma):
     img = cp.asnumpy(img)
+    print("img.shape:", img.shape)
     n = img.shape[0] * img.shape[1]
     m_l = n * (p_h ** 2)
 
@@ -68,10 +72,17 @@ def compute_L(img, p_h, p_kappa, p_sigma):
 
     pair1, pair2, val_pos, val_neg = compute_pairs(img_lab, p_h, p_kappa, p_sigma)
 
-    rows = cp.asarray(np.arange(start=0, stop=m_l, dtype=np.float64), dtype=cp.float64)
+    rows = cp.asarray(np.arange(start=0, stop=m_l, dtype=np.uint64), dtype=cp.uint64)
     rows = cp.hstack([rows, rows])
     cols = cp.hstack([pair1, pair2])
     vals = cp.hstack([val_pos, val_neg])
+
+    print("m_l:", m_l)
+    print("n:", n)
+    print("rows.shape:", rows.shape)
+    print("cols.shape:", cols.shape)
+    print("cp.max(rows):", cp.max(rows))
+    print("cp.max(cols):", cp.max(cols))
 
     M = csr_matrix((vals, (rows, cols)), shape=(m_l, n), dtype=cp.float64)
     print("M:", M[0:10,0:10])
@@ -158,14 +169,7 @@ def image_flatten(img, p_iter, p_h, p_alpha, p_epsilon, p_theta, p_lambda, p_kap
 
 
 def modular_flatten(img, width, height):
-    pass
-
-
-if __name__ == "__main__":
-    filename = "test_data/seaside_150_150"
-    filetype = ".png"
-    img = cv2.imread(cv2.samples.findFile(filename + filetype))
-    assert img is not None, "file could not be read"
+    img_flat = np.copy(img)
 
     p_iter = 4
     p_h = 5
@@ -175,5 +179,25 @@ if __name__ == "__main__":
     p_lambda = 128.0
     p_kappa = 1.0
     p_sigma = 0.9
-    flat_img = cp.asnumpy(image_flatten(img, p_iter, p_h, p_alpha, p_epsilon, p_theta, p_lambda, p_kappa, p_sigma))
-    cv2.imwrite(filename + "_flattened" + filetype, flat_img)
+
+    print(img.shape[0], img.shape[1])
+
+    for h in range(0, (img.shape[0] // height) + 1):
+        for w in range(0, (img.shape[1] // width) + 1):
+            print(range(w*width, (w+1)*width))
+            print(range(h*height, (h+1)*height))
+            cropped_img = img[h*height:(h+1)*height,w*width:(w+1)*width,:]
+            print("cropped_img.shape:", cropped_img.shape)
+            cropped_img_flat = cp.asnumpy(image_flatten(cropped_img, p_iter, p_h, p_alpha, p_epsilon, p_theta, p_lambda, p_kappa, p_sigma))
+            img_flat[h*height:(h+1)*height,w*width:(w+1)*width,:] = cropped_img_flat
+
+    return img_flat
+
+if __name__ == "__main__":
+    filename = "test_data/seaside_324_218"
+    filetype = ".png"
+    img = cv2.imread(cv2.samples.findFile(filename + filetype))
+    assert img is not None, "file could not be read"
+
+    img_flat = modular_flatten(img, 100, 100)
+    cv2.imwrite(filename + "_flattened" + filetype, img_flat)
