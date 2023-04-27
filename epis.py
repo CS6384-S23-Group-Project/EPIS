@@ -168,9 +168,13 @@ def image_flatten(img, p_iter, p_h, p_alpha, p_epsilon, p_theta, p_lambda, p_kap
     return z2rgb(z[2], img.shape[0], img.shape[1])
 
 
-def modular_flatten(img, width, height):
-    img_flat = np.copy(img)
+if __name__ == "__main__":
+    filename = "test_data/seaside_180_120"
+    filetype = ".png"
+    img = cv2.imread(cv2.samples.findFile(filename + filetype))
+    assert img is not None, "file could not be read"
 
+    # default parameters
     p_iter = 4
     p_h = 5
     p_alpha = 20.0
@@ -180,29 +184,5 @@ def modular_flatten(img, width, height):
     p_kappa = 1.0
     p_sigma = 0.9
 
-    if (img.shape[0] == height) or (img.shape[1] == width):
-        img_flat = cp.asnumpy(image_flatten(img, p_iter, p_h, p_alpha, p_epsilon, p_theta, p_lambda, p_kappa, p_sigma))
-    else:
-        for h in range(0, (img.shape[0] // height) + 1):
-            for w in range(0, (img.shape[1] // width) + 1):
-                if (h * height == img.shape[0]) or (w * width == img.shape[1]):
-                    continue
-
-                print(range(w*width, (w+1)*width))
-                print(range(h*height, (h+1)*height))
-                cropped_img = img[h*height:(h+1)*height,w*width:(w+1)*width,:]
-                print("cropped_img.shape:", cropped_img.shape)
-                cropped_img_flat = cp.asnumpy(image_flatten(cropped_img, p_iter, p_h, p_alpha, p_epsilon, p_theta, p_lambda, p_kappa, p_sigma))
-                img_flat[h*height:(h+1)*height,w*width:(w+1)*width,:] = cropped_img_flat
-
-    return img_flat
-
-
-if __name__ == "__main__":
-    filename = "test_data/FLIR_00010_640_512"
-    filetype = ".png"
-    img = cv2.imread(cv2.samples.findFile(filename + filetype))
-    assert img is not None, "file could not be read"
-
-    img_flat = modular_flatten(img, 160, 126)
+    img_flat = cp.asnumpy(image_flatten(img, p_iter, p_h, p_alpha, p_epsilon, p_theta, p_lambda, p_kappa, p_sigma))
     cv2.imwrite(filename + "_flattened" + filetype, img_flat)
