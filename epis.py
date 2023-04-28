@@ -58,7 +58,57 @@ def compute_pairs(img_lab, p_h, p_kappa, p_sigma):
     return (pair1, pair2, val_pos, val_neg)
 
 
-def compute_L(img, p_h, p_kappa, p_sigma):
+def compute_max_grad(img, pair1, pair2):
+    img = img.copy()
+    img = img / 255.0
+    gradients_x = np.mean(cv2.Sobel(src=img, ddepth=-1, dx=1, dy=0, ksize=3), 2)
+    gradients_y = np.mean(cv2.Sobel(src=img, ddepth=-1, dx=0, dy=1, ksize=3), 2)
+    gradients = np.sqrt(np.square(gradients_x) + np.square(gradients_y))
+    #print("gradients:", gradients)
+
+    max_gradients = np.zeros_like(pair1)
+
+    i = 0
+    for (p1, p2) in zip(pair1, pair2):
+        x1 = int(p1 % img.shape[1])
+        y1 = int(p1 // img.shape[1])
+        x2 = int(p2 % img.shape[1])
+        y2 = int(p2 // img.shape[1])
+
+        if x2 > x1 and y2 > y1:
+            xstep = 1
+            ystep = 1
+        elif x2 > x1 and y2 < y1:
+            xstep = 1
+            ystep = -1
+        elif x2 < x1 and y2 > y1:
+            xstep = -1
+            ystep = 1
+        else:
+            xstep = -1
+            ystep = -1
+
+        dx = x1
+        dy = y1
+        max_gradient_along_line = 0.0
+
+        j = 0
+        while dx < x2 and dy < y2:
+            if j > 5:
+                break
+            if gradients[dy, dx] > max_gradient_along_line:
+                max_gradient_along_line = gradients[dy, dx]
+            dx += xstep
+            dy += ystep
+            j += 1
+
+        max_gradients[i] = max_gradient_along_line
+        i += 1
+
+    return max_gradients
+
+
+def compute_L(img, p_h, p_kappa, p_sigma, p_eta):
     img = cp.asnumpy(img)
     print("img.shape:", img.shape)
     n = img.shape[0] * img.shape[1]
@@ -71,6 +121,12 @@ def compute_L(img, p_h, p_kappa, p_sigma):
     img_lab[:,:,2] = (img_lab[:,:,2] / 220.0) * 120.0
 
     pair1, pair2, val_pos, val_neg = compute_pairs(img_lab, p_h, p_kappa, p_sigma)
+    #max_gradients = cp.array(compute_max_grad(img, cp.asnumpy(pair1), cp.asnumpy(pair2)))
+    #print("max_gradients:", max_gradients)
+    #max_gradients = max_gradients * p_eta
+
+    #val_pos = cp.maximum(val_pos, max_gradients)
+    #val_neg = cp.minimum(val_neg, -1 * max_gradients)
 
     rows = cp.asarray(np.arange(start=0, stop=m_l, dtype=np.uint64), dtype=cp.uint64)
     rows = cp.hstack([rows, rows])
@@ -121,20 +177,12 @@ def shrink(y, p_gamma):
     return (y / y_norm) * max(y_norm - p_gamma, 0)
 
 
-def shrink2(y, p_gamma):
-    # x = cp.copy(y)
-    # y = cp.max(cp.abs(y) - p_gamma, 0)
-    # y = cp.where(x < 0, y, -1 * y)
-    # return y
-    pass
-
-
-def image_flatten(img, p_iter, p_h, p_alpha, p_epsilon, p_theta, p_lambda, p_kappa, p_sigma):
+def image_flatten(img, p_iter, p_h, p_alpha, p_epsilon, p_theta, p_lambda, p_kappa, p_sigma, p_eta):
     zin = rgb2z(cp.asarray(img))
     z = cp.zeros((3, zin.shape[0]), dtype=cp.float64)
     z[0] = zin
 
-    L = p_alpha * compute_L(z2rgb(z[0], img.shape[0], img.shape[1]), p_h, p_kappa, p_sigma)
+    L = p_alpha * compute_L(z2rgb(z[0], img.shape[0], img.shape[1]), p_h, p_kappa, p_sigma, p_eta)
     LT = L.T
     LTL = LT @ L
 
@@ -183,6 +231,7 @@ if __name__ == "__main__":
     p_lambda = 128.0
     p_kappa = 1.0
     p_sigma = 0.9
+    p_eta = 0.4
 
-    img_flat = cp.asnumpy(image_flatten(img, p_iter, p_h, p_alpha, p_epsilon, p_theta, p_lambda, p_kappa, p_sigma))
+    img_flat = cp.asnumpy(image_flatten(img, p_iter, p_h, p_alpha, p_epsilon, p_theta, p_lambda, p_kappa, p_sigma, p_eta))
     cv2.imwrite(filename + "_flattened" + filetype, img_flat)
