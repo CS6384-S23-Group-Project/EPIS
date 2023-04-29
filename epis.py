@@ -8,21 +8,44 @@ import sys
 import random
 
 
-def affinity(pi_lab, pj_lab, p_kappa, p_sigma):
+def affinity(pi_lab: np.ndarray, pj_lab: np.ndarray, p_kapp: float, p_sigma: float) -> float:
     """ 
-    pi_lab: np.ndarray(3)
-    pj_lab: np.ndarray(3)
+    Compute the affinity between two CIE-LAB pixels. In other words, how similar they are. 
+    A higher affinity indicates more similarity, vice-versa.
+
+    Parameters:
+        pi_lab - a pixel of shape (3)
+        pj_lab - a pixel of shape (3)
     
-    Calculate the affinity between CIELAB pixel_i and pixel_j.
+    Output:
+        affinity - the affinity between CIE-LAB pixels p_i and p_j, value ranges from [0.0, 1.0]
     """
 
     pi_lab[0] = pi_lab[0] * p_kappa
     pj_lab[0] = pj_lab[0] * p_kappa
 
-    return np.exp(- np.linalg.norm(pi_lab - pj_lab) * p_sigma)
+    return np.exp(-p_sigma * np.linalg.norm(pi_lab - pj_lab))
 
 
-def compute_pairs(img_lab, p_h, p_kappa, p_sigma):
+def compute_pairs(
+    img_lab: np.ndarray, 
+    p_h: int, 
+    p_kappa: float, p_sigma: float
+) -> (cp.ndarray, cp.ndarray, cp.ndarray, cp.ndarray):
+    """
+
+    Parameters:
+        img_lab -
+        p_h -
+        p_kappa -
+        p_sigma -
+
+    Output:
+        pair1 -
+        pair2 -
+        val_pos -
+        val_neg -
+    """
     n = img_lab.shape[0] * img_lab.shape[1]
     m_l = n * (p_h ** 2)
 
@@ -30,8 +53,6 @@ def compute_pairs(img_lab, p_h, p_kappa, p_sigma):
     pair2 = cp.zeros((m_l), dtype=cp.uint64)
     val_pos = cp.zeros((m_l), dtype=cp.float64)
     val_neg = cp.zeros((m_l), dtype=cp.float64)
-    
-    print("img_lab.shape:", img_lab.shape)
 
     k = 0
     for y1 in range(0, img_lab.shape[0]):
@@ -58,13 +79,22 @@ def compute_pairs(img_lab, p_h, p_kappa, p_sigma):
     return (pair1, pair2, val_pos, val_neg)
 
 
-def compute_max_grad(img, pair1, pair2):
+def compute_max_grad(img: np.ndarray, pair1: np.ndarray, pair2: np.ndarray) -> np.ndarray:
+    """
+
+    Parameters:
+        img -
+        pair1 -
+        pair2 - 
+
+    Output:
+        max_gradients - 
+    """
     img = img.copy()
     img = img / 255.0
     gradients_x = np.mean(cv2.Sobel(src=img, ddepth=-1, dx=1, dy=0, ksize=3), 2)
     gradients_y = np.mean(cv2.Sobel(src=img, ddepth=-1, dx=0, dy=1, ksize=3), 2)
     gradients = np.sqrt(np.square(gradients_x) + np.square(gradients_y))
-    #print("gradients:", gradients)
 
     max_gradients = np.zeros_like(pair1)
 
@@ -108,7 +138,25 @@ def compute_max_grad(img, pair1, pair2):
     return max_gradients
 
 
-def compute_L(img, p_h, p_kappa, p_sigma, p_eta):
+def compute_L(
+    img: np.ndarray, 
+    p_h: int, 
+    p_kappa: float, p_sigma: float, p_eta: float, preserve_edges: bool
+) -> csr_matrix:
+    """
+
+
+    Parameters:
+        img - 
+        p_h - the size of local neighborhood for computing pairs
+        p_kappa - 
+        p_sigma - 
+        p_eta -
+        preserve_edges - controls whether to preserve edges
+
+    Output:
+        L - a csr_matrix that is an identity of M matrices.
+    """
     img = cp.asnumpy(img)
     print("img.shape:", img.shape)
     n = img.shape[0] * img.shape[1]
@@ -121,27 +169,21 @@ def compute_L(img, p_h, p_kappa, p_sigma, p_eta):
     img_lab[:,:,2] = (img_lab[:,:,2] / 220.0) * 120.0
 
     pair1, pair2, val_pos, val_neg = compute_pairs(img_lab, p_h, p_kappa, p_sigma)
-    #max_gradients = cp.array(compute_max_grad(img, cp.asnumpy(pair1), cp.asnumpy(pair2)))
-    #print("max_gradients:", max_gradients)
-    #max_gradients = max_gradients * p_eta
+    
+    if preserve_edges:
+        max_gradients = cp.array(compute_max_grad(img, cp.asnumpy(pair1), cp.asnumpy(pair2)))
+        max_gradients = np.exp((max_gradients * p_eta) * -p_sigma)
 
-    #val_pos = cp.maximum(val_pos, max_gradients)
-    #val_neg = cp.minimum(val_neg, -1 * max_gradients)
+        val_pos = cp.maximum(val_pos, max_gradients)
+        val_neg = cp.minimum(val_neg, -1 * max_gradients)
 
     rows = cp.asarray(np.arange(start=0, stop=m_l, dtype=np.uint64), dtype=cp.uint64)
     rows = cp.hstack([rows, rows])
     cols = cp.hstack([pair1, pair2])
     vals = cp.hstack([val_pos, val_neg])
 
-    print("m_l:", m_l)
-    print("n:", n)
-    print("rows.shape:", rows.shape)
-    print("cols.shape:", cols.shape)
-    print("cp.max(rows):", cp.max(rows))
-    print("cp.max(cols):", cp.max(cols))
-
     M = csr_matrix((vals, (rows, cols)), shape=(m_l, n), dtype=cp.float64)
-    print("M:", M[0:10,0:10])
+    print(type(M))
     O = csr_matrix((m_l, n), dtype=cp.float64)
 
     return vstack(
@@ -153,22 +195,47 @@ def compute_L(img, p_h, p_kappa, p_sigma, p_eta):
     )
 
 
-def rgb2z(img):
+def rgb2z(img: np.ndarray) -> np.ndarray:
+    """
+    convert a rgb image of shape (height, width, 3) into an array of shape (height * width * 3)
+    where each of the R, G, and B values are concatenated to form a single 1-D array.
+
+    Parameters:
+        img - a np.ndarray of shape (height, width, 3)
+
+    Output:
+        z - a np.ndarray of shape (height * width * 3)
+    """
     z_r = img[:,:,0].flatten()
     z_g = img[:,:,1].flatten()
     z_b = img[:,:,2].flatten()
     return cp.concatenate((z_r.T, z_g.T, z_b.T)).T
 
 
-def z2rgb(z, y, x):
+def z2rgb(z: np.ndarray, height, width):
+    """
+    convert an array of shape (height * width * 3) that is the concatenation of the R, G, and B values of a image
+    back into an image of shape (height, width, 3)
+
+    Parameters:
+        z - a np.ndarray of shape (height * width * 3)
+        height - the original height of the image 
+        width - the original width of the image
+
+    Output:
+        img - a np.ndarray of shape (height, width, 3)
+    """
+    assert z.shape[0] == (height * width * 3)
+
     len = z.shape[0] // 3
     z_r = z[0:len]
     z_g = z[len:2*len]
     z_b = z[2*len:]
-    img = cp.zeros((y, x, 3), dtype=np.uint8)
-    img[:,:,0] = z_r.reshape((y, x))
-    img[:,:,1] = z_g.reshape((y, x))
-    img[:,:,2] = z_b.reshape((y, x))
+
+    img = cp.zeros((height, width, 3), dtype=np.uint8)
+    img[:,:,0] = z_r.reshape((height, width))
+    img[:,:,1] = z_g.reshape((height, width))
+    img[:,:,2] = z_b.reshape((height, width))
     return img
 
 
@@ -177,12 +244,35 @@ def shrink(y, p_gamma):
     return (y / y_norm) * max(y_norm - p_gamma, 0)
 
 
-def image_flatten(img, p_iter, p_h, p_alpha, p_epsilon, p_theta, p_lambda, p_kappa, p_sigma, p_eta):
+def image_flatten(
+    img: np.ndarray, 
+    p_iter: int, p_h: int, 
+    p_alpha: float, p_epsilon: float, p_theta: float, p_lambda: float, p_kappa: float, p_sigma: float, p_eta: float,
+    preserve_edges: bool
+) -> np.ndarray:
+    """
+    L1 Flatten an image using the provided parameters.
+
+    Parameters:
+        img - a np.ndarray of shape (height, width, 3)
+        p_iter - the number of iterations for the L1 energy optimization algorithm
+        p_h - the size of local neighborhood used in creating the M matrix
+        p_alpha - ?
+        p_epsilon - a threshold to control the L1 energy optimization algorithm to stop
+        p_theta - ?
+        p_lambda - controls the amount of flatness in the outputing image (higher = more flat)
+        p_kappa - ?
+        p_sigma - ?
+        p_eta - controls the prevalence of the gradients used for edge-preserving
+
+    Output:
+        img_flat - a np.ndarray of shape (height, width, 3) that is the flattened version of `img`
+    """
     zin = rgb2z(cp.asarray(img))
     z = cp.zeros((3, zin.shape[0]), dtype=cp.float64)
     z[0] = zin
 
-    L = p_alpha * compute_L(z2rgb(z[0], img.shape[0], img.shape[1]), p_h, p_kappa, p_sigma, p_eta)
+    L = p_alpha * compute_L(z2rgb(z[0], img.shape[0], img.shape[1]), p_h, p_kappa, p_sigma, p_eta, preserve_edges)
     LT = L.T
     LTL = LT @ L
 
@@ -196,8 +286,7 @@ def image_flatten(img, p_iter, p_h, p_alpha, p_epsilon, p_theta, p_lambda, p_kap
     print("\n---- OPTIMIZATION ------------------")
     while i < p_iter and cp.linalg.norm(z[1] - z[0]) > p_epsilon:
         print("Iteration {}".format(i))
-        print("difference:", cp.linalg.norm(z[1] - z[0]))
-        print("")
+        print("Difference: {}\n".format(cp.linalg.norm(z[1] - z[0])))
 
         v = p_theta * zin + cp.asarray(p_lambda * LT @ (d[1] - b[1]))
 
@@ -217,7 +306,7 @@ def image_flatten(img, p_iter, p_h, p_alpha, p_epsilon, p_theta, p_lambda, p_kap
 
 
 if __name__ == "__main__":
-    filename = "test_data/seaside_180_120"
+    filename = "test_data/cat_136_180"
     filetype = ".png"
     img = cv2.imread(cv2.samples.findFile(filename + filetype))
     assert img is not None, "file could not be read"
@@ -226,12 +315,19 @@ if __name__ == "__main__":
     p_iter = 4
     p_h = 5
     p_alpha = 20.0
-    p_epsilon = 0.001
+    p_epsilon = 0.01
     p_theta = 50.0
     p_lambda = 128.0
     p_kappa = 1.0
     p_sigma = 0.9
-    p_eta = 0.4
+    p_eta = 0.1
+    preserve_edges = False
 
-    img_flat = cp.asnumpy(image_flatten(img, p_iter, p_h, p_alpha, p_epsilon, p_theta, p_lambda, p_kappa, p_sigma, p_eta))
-    cv2.imwrite(filename + "_flattened" + filetype, img_flat)
+    img_flat = cp.asnumpy(image_flatten(
+        img, p_iter, p_h, p_alpha, p_epsilon, p_theta, p_lambda, p_kappa, p_sigma, p_eta, preserve_edges
+    ))
+
+    if preserve_edges:
+        cv2.imwrite(filename + "_smoothed" + filetype, img_flat)
+    else:
+        cv2.imwrite(filename + "_flattened" + filetype, img_flat)        
