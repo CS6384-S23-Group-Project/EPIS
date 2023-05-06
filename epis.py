@@ -238,10 +238,10 @@ def z2rgb(z: np.ndarray, height, width):
     """
     assert z.shape[0] == (height * width * 3)
 
-    len = z.shape[0] // 3
-    z_r = z[0:len]
-    z_g = z[len:2*len]
-    z_b = z[2*len:]
+    length = z.shape[0] // 3
+    z_r = z[0:length]
+    z_g = z[length:2*length]
+    z_b = z[2*length:]
 
     img = cp.zeros((height, width, 3), dtype=np.uint8)
     img[:,:,0] = z_r.reshape((height, width))
