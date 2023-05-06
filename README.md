@@ -1,7 +1,7 @@
 # EPIS
 An implementation of the Edge-Preserving Image Smoothing (EPIS) algorithm discussed in this [paper](https://cseweb.ucsd.edu/~bisai/papers/SIGGRAPH15_IntrinsicDecomposition.pdf).
 
-Our goal is to measure the impact of L1 piece-wise flattenning with edge-preserving on image compression for various image formats.
+Our goal is to measure the impact of L1 piece-wise flattening with edge-preserving on image compression for various image formats.
 
 ## Showcase
 
