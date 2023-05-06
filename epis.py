@@ -363,6 +363,7 @@ if __name__ == "__main__":
     ))
 
     if preserve_edges:
-        cv2.imwrite(filepath.root + "_smoothed" + filepath.suffix, img_flat)
+        new_stem = filepath.stem + "_smoothed"
     else:
-        cv2.imwrite(filepath.root + "_flattened" + filepath.suffix, img_flat)        
+        new_stem = filepath.stem + "_flattened"
+    cv2.imwrite(str(filepath.with_stem(new_stem)), img_flat) 
