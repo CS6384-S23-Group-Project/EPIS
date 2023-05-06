@@ -15,6 +15,10 @@ EPIS transforms an image (left) into a flattened image (right).
 python epis.py [filepath to image]
 ```
 
+## TODO
+
+* Speedup `compute_pairs()` by generating the matrices `pair1` and `pair2` instead building them iteratively.
+
 ## Requirements
 
 Libraries used and their respective versions. The minimum versions for each library are unknown. A detailed list can be found in [library_versions.txt](https://github.com/CS6384-S23-Group-Project/EPIS/blob/main/library_versions.txt).
