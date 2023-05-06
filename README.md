@@ -17,7 +17,7 @@ python epis.py [filepath to image]
 
 ## Requirements
 
-Libraries used and their respective versions. The minimum versions for each library are unknown.
+Libraries used and their respective versions. The minimum versions for each library are unknown. A detailed list can be found in [library_versions.txt](https://github.com/CS6384-S23-Group-Project/EPIS/blob/main/library_versions.txt).
 
 * Python 3.10.0
 * Numpy 1.24.2
