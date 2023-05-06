@@ -31,7 +31,7 @@ The hardware used for `test_data` are:
 * AMD Ryzen 5 5600x 6-Core 12-Thread
 * 8GB Nvidia RTX 3070
 * 32 GB DDR4-3600 RAM
-* 
+
 EPIS relies heavily on GPU computation, specifically sparse matrix multiplication and sparse matrix solving.
 EPIS uses incredibly large sparse matrixes which necessitates a large pool of VRAM. This is the limiting factor
 when flattening images. Downscaling images is required depending on the hardware used.
