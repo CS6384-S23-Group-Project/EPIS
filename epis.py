@@ -9,7 +9,7 @@ import sys
 import random
 
 
-def affinity(pi_lab: np.ndarray, pj_lab: np.ndarray, p_kapp: float, p_sigma: float) -> float:
+def affinity(pi_lab: np.ndarray, pj_lab: np.ndarray, p_kappa: float, p_sigma: float) -> float:
     """ 
     Compute the affinity between two CIE-LAB pixels. In other words, how similar they are. 
     A higher affinity indicates more similarity, vice-versa.
@@ -17,11 +17,12 @@ def affinity(pi_lab: np.ndarray, pj_lab: np.ndarray, p_kapp: float, p_sigma: flo
     Parameters:
         pi_lab - a pixel of shape (3)
         pj_lab - a pixel of shape (3)
+        p_kappa - ?
+        p_sigma - lightness weight
     
     Output:
         affinity - the affinity between CIE-LAB pixels p_i and p_j, value ranges from [0.0, 1.0]
     """
-
     pi_lab[0] = pi_lab[0] * p_kappa
     pj_lab[0] = pj_lab[0] * p_kappa
 
@@ -34,18 +35,27 @@ def compute_pairs(
     p_kappa: float, p_sigma: float
 ) -> (cp.ndarray, cp.ndarray, cp.ndarray, cp.ndarray):
     """
+    Computes several helpful arrays used in the efficient construction of the global matrix (M) used in compute_L().
+    This is orders of magnitude faster to compute than an iterative approach to constructing the sparse global matrix.
+
+    Pixel_i is the kth pixel in the image. Pixel_j is a pixel within Pixel_i's neighborhood.
+
+    val_pos[k] = affinity(pair1[k], pair2[k])
+    val_neg[k] = -1 * affinity(pair1[k], pair2[k])
+
+    TODO: compute pair1, pair2, val_pos, val_neg using matrix vectorization instead of iteratively.
 
     Parameters:
-        img_lab -
-        p_h -
-        p_kappa -
-        p_sigma -
+        img_lab - a np.ndarray of shape (height, width, 3) where dimension [2] is a CIE-LAB pixel.
+        p_h - the size of local neighborhood used in creating the M matrix
+        p_kappa - ? 
+        p_sigma - lightness weight in affinity function
 
     Output:
-        pair1 -
-        pair2 -
-        val_pos -
-        val_neg -
+        pair1 - an array of absolute positions of pixel_i corresponding to pair2
+        pair2 - an array of absolute positions of pixel_j corresponding to pair1
+        val_pos - an array of affinities between pixel_i and pixel_j corresponding to pair1 and pair2
+        val_neg - an array of negative affinities between pixel_i and pixel_j corresponding to pair1 and pair2
     """
     n = img_lab.shape[0] * img_lab.shape[1]
     m_l = n * (p_h ** 2)
@@ -82,14 +92,16 @@ def compute_pairs(
 
 def compute_max_grad(img: np.ndarray, pair1: np.ndarray, pair2: np.ndarray) -> np.ndarray:
     """
+    Computes the maximum gradient along the lines between pixel_i and pixel_j represented by pair1 and pair2 respectively.
 
     Parameters:
-        img -
-        pair1 -
-        pair2 - 
+        img - a np.ndarray of shape (height, width, 3) where dimension [2] is a RGB pixel.
+        pair1 - an array of absolute positions of pixel_i corresponding to pair2
+        pair2 - an array of absolute positions of pixel_j corresponding to pair1
 
     Output:
-        max_gradients - 
+        max_gradients - a np.ndarray of shape (len(pair1), 1) where dimension [1] is the maximum gradient along 
+            the path between pixel_i and pixel_j.
     """
     img = img.copy()
     img = img / 255.0
@@ -145,21 +157,20 @@ def compute_L(
     p_kappa: float, p_sigma: float, p_eta: float, preserve_edges: bool
 ) -> csr_matrix:
     """
-
+    Compute the local sparsity matrix (L) used in the split-bergman algorithm.
 
     Parameters:
-        img - 
+        img - a np.ndarray of shape (height, width, 3) where dimension [2] is a RGB pixel.
         p_h - the size of local neighborhood for computing pairs
-        p_kappa - 
-        p_sigma - 
-        p_eta -
+        p_kappa - ?
+        p_sigma - lightness weight used in affinity()
+        p_eta - weight for maximum gradient
         preserve_edges - controls whether to preserve edges
 
     Output:
         L - a csr_matrix that is an identity of M matrices.
     """
     img = cp.asnumpy(img)
-    print("img.shape:", img.shape)
     n = img.shape[0] * img.shape[1]
     m_l = n * (p_h ** 2)
 
@@ -184,7 +195,6 @@ def compute_L(
     vals = cp.hstack([val_pos, val_neg])
 
     M = csr_matrix((vals, (rows, cols)), shape=(m_l, n), dtype=cp.float64)
-    print(type(M))
     O = csr_matrix((m_l, n), dtype=cp.float64)
 
     return vstack(
@@ -241,6 +251,16 @@ def z2rgb(z: np.ndarray, height, width):
 
 
 def shrink(y, p_gamma):
+    """
+    ???
+
+    Parameters:
+        y - ?
+        p_gamma - the regularization term weight
+    
+    Output:
+        d - ?
+    """
     y_norm = cp.linalg.norm(y)
     return (y / y_norm) * max(y_norm - p_gamma, 0)
 
@@ -258,13 +278,14 @@ def image_flatten(
         img - a np.ndarray of shape (height, width, 3)
         p_iter - the number of iterations for the L1 energy optimization algorithm
         p_h - the size of local neighborhood used in creating the M matrix
-        p_alpha - ?
+        p_alpha - the local sparseness weight
         p_epsilon - a threshold to control the L1 energy optimization algorithm to stop
-        p_theta - ?
-        p_lambda - controls the amount of flatness in the outputing image (higher = more flat)
+        p_theta - the image approximation term
+        p_lambda - the regularization term weight (controls how "flat" the image should become)
         p_kappa - ?
-        p_sigma - ?
-        p_eta - controls the prevalence of the gradients used for edge-preserving
+        p_sigma - lightness weight in affinity function
+        p_eta - weight for maximum gradient (controls the prevalence of the gradients used for edge-preserving)
+        preserve_edges - controls whether edge preserving is applied
 
     Output:
         img_flat - a np.ndarray of shape (height, width, 3) that is the flattened version of `img`
