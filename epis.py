@@ -363,6 +363,6 @@ if __name__ == "__main__":
     ))
 
     if preserve_edges:
-        cv2.imwrite(filename + "_smoothed_256" + filetype, img_flat)
+        cv2.imwrite(filepath.root + "_smoothed" + filepath.suffix, img_flat)
     else:
-        cv2.imwrite(filename + "_flattened_256" + filetype, img_flat)        
+        cv2.imwrite(filepath.root + "_flattened" + filepath.suffix, img_flat)        
