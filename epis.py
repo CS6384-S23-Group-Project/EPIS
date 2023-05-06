@@ -208,7 +208,7 @@ def compute_L(
 
 def rgb2z(img: np.ndarray) -> np.ndarray:
     """
-    convert a rgb image of shape (height, width, 3) into an array of shape (height * width * 3)
+    Convert a rgb image of shape (height, width, 3) into an array of shape (height * width * 3)
     where each of the R, G, and B values are concatenated to form a single 1-D array.
 
     Parameters:
@@ -225,7 +225,7 @@ def rgb2z(img: np.ndarray) -> np.ndarray:
 
 def z2rgb(z: np.ndarray, height, width):
     """
-    convert an array of shape (height * width * 3) that is the concatenation of the R, G, and B values of a image
+    Convert an array of shape (height * width * 3) that is the concatenation of the R, G, and B values of a image
     back into an image of shape (height, width, 3)
 
     Parameters:
