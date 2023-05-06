@@ -1,0 +1,34 @@
+
+Results from `cupyx._runtime._RuntimeInfo()`
+
+OS                           : Windows-10-{withheld}
+Python Version               : 3.10.0
+CuPy Version                 : 12.0.0
+CuPy Platform                : NVIDIA CUDA
+NumPy Version                : 1.24.2
+SciPy Version                : 1.10.1
+Cython Build Version         : 0.29.33
+Cython Runtime Version       : None
+CUDA Root                    : {withheld}\NVIDIA GPU Computing Toolkit\CUDA\v12.1
+nvcc PATH                    : {withheld}\NVIDIA GPU Computing Toolkit\CUDA\v12.1\bin\nvcc.EXE
+CUDA Build Version           : 12010
+CUDA Driver Version          : 12010
+CUDA Runtime Version         : 12010
+cuBLAS Version               : 120100
+cuFFT Version                : 11002
+cuRAND Version               : 10302
+cuSOLVER Version             : (11, 4, 4)
+cuSPARSE Version             : 12002
+NVRTC Version                : (12, 1)
+Thrust Version               : 200001
+CUB Build Version            : 200001
+Jitify Build Version         : 4a37de0
+cuDNN Build Version          : None
+cuDNN Version                : None
+NCCL Build Version           : None
+NCCL Runtime Version         : None
+cuTENSOR Version             : None
+cuSPARSELt Build Version     : None
+Device 0 Name                : NVIDIA GeForce RTX 3070
+Device 0 Compute Capability  : 86
+Device 0 PCI Bus ID          : 0000:08:00.0
