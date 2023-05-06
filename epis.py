@@ -1,6 +1,7 @@
 
 from cupyx.scipy.sparse import identity, csr_matrix, hstack, vstack
 from cupyx.scipy.sparse.linalg import spsolve
+from pathlib import Path
 import numpy as np
 import cupy as cp
 import cv2
@@ -306,10 +307,23 @@ def image_flatten(
 
 
 if __name__ == "__main__":
-    filename = "test_data/cat_136_180"
-    filetype = ".png"
-    img = cv2.imread(cv2.samples.findFile(filename + filetype))
-    assert img is not None, "file could not be read"
+    if len(sys.argv) != 2:
+        print("Usage: python epis.py [filepath of image]")
+        sys.exit(1)
+    
+    filepath = Path(sys.argv[1])
+    if not filepath.exists():
+        print("Filepath `{}` does not exist.".format(filepath))
+        sys.exit(1)
+    if filepath.is_dir():
+        print("Filepath `{}` is a directory. Filepath must be a file.".format(filepath))
+        sys.exit(1)
+    if not filepath.suffix in [".jpg", ".jpeg", ".png", ".webp"]:
+        print("Filepath `{}` is not a supported filetype.".format(filepath))
+        sys.exit(1)
+
+    img = cv2.imread(cv2.samples.findFile(str(filepath)))
+    assert img is not None, "File `{}` could not be read".format(filepath)
 
     # default parameters
     p_iter = 4
@@ -317,7 +331,7 @@ if __name__ == "__main__":
     p_alpha = 20.0
     p_epsilon = 0.01
     p_theta = 50.0
-    p_lambda = 128.0
+    p_lambda = 256.0
     p_kappa = 1.0
     p_sigma = 0.9
     p_eta = 0.1
@@ -328,6 +342,6 @@ if __name__ == "__main__":
     ))
 
     if preserve_edges:
-        cv2.imwrite(filename + "_smoothed" + filetype, img_flat)
+        cv2.imwrite(filename + "_smoothed_256" + filetype, img_flat)
     else:
-        cv2.imwrite(filename + "_flattened" + filetype, img_flat)        
+        cv2.imwrite(filename + "_flattened_256" + filetype, img_flat)        
