@@ -352,7 +352,7 @@ if __name__ == "__main__":
     p_alpha = 20.0
     p_epsilon = 0.01
     p_theta = 50.0
-    p_lambda = 256.0
+    p_lambda = 128.0
     p_kappa = 1.0
     p_sigma = 0.9
     p_eta = 0.1
